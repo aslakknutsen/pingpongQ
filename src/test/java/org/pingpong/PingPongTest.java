@@ -1,7 +1,7 @@
 package org.pingpong;
 
 import org.arquillian.cube.HostIp;
-import org.arquillian.cube.q.api.Q;
+import org.arquillian.cube.q.api.NetworkChaos;
 import org.hamcrest.CoreMatchers;
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.arquillian.test.api.ArquillianResource;
@@ -16,10 +16,11 @@ import java.net.URL;
 import java.util.concurrent.TimeUnit;
 
 import static org.arquillian.cube.q.api.Q.DurationRunCondition.during;
-import static org.arquillian.cube.q.api.Q.JitterType.jitter;
-import static org.arquillian.cube.q.api.Q.LatencyType.latency;
-import static org.arquillian.cube.q.api.Q.ToxicDirectionStream.DOWNSTREAM;
-import static org.arquillian.cube.q.api.Q.ToxicityType.toxicity;
+import static org.arquillian.cube.q.api.NetworkChaos.LatencyType.latency;
+import static org.arquillian.cube.q.api.NetworkChaos.LatencyType.latencyInMillis;
+import static org.arquillian.cube.q.api.NetworkChaos.JitterType.jitter;
+import static org.arquillian.cube.q.api.NetworkChaos.ToxicDirectionStream.DOWNSTREAM;
+import static org.arquillian.cube.q.api.NetworkChaos.ToxicityType.toxicity;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -30,11 +31,12 @@ public class PingPongTest {
     private String ip;
 
     @ArquillianResource
-    private org.arquillian.cube.q.api.Q Q;
+    private NetworkChaos networkChaos;
 
     @Test
     public void shouldPingPong() throws Exception {
         {
+            ip = "localhost";
             //without Q
             URL url = new URL("http://" + ip + ":" + 8081 + "/pingpong/ping");
             HttpURLConnection con = (HttpURLConnection) url.openConnection();
@@ -53,7 +55,7 @@ public class PingPongTest {
             assertThat(response.toString(), is("{  \"status\": \"OK\"}"));
         }
 
-        Q.on("pingpong", 8080).exec(during(15, TimeUnit.SECONDS), () -> {
+        networkChaos.on("pingpong", 8080).exec(during(15, TimeUnit.SECONDS), () -> {
             URL url = new URL("http://" + ip + ":" + 8081 + "/pingpong/ping");
             HttpURLConnection con = (HttpURLConnection) url.openConnection();
             con.setRequestMethod("GET");
@@ -71,7 +73,7 @@ public class PingPongTest {
             assertThat(response.toString(), is("{  \"status\": \"OK\"}"));
         });
 
-        Q.on("pingpong", 8080).latency(latency(500), jitter(0),
+        networkChaos.on("pingpong", 8080).latency(latencyInMillis(500), jitter(0),
                                         toxicity(0.5f), DOWNSTREAM)
                                .exec(during(15, TimeUnit.SECONDS), () -> {
             URL url = new URL("http://" + ip + ":" + 8081 + "/pingpong/ping");
@@ -91,7 +93,7 @@ public class PingPongTest {
             assertThat(response.toString(), is("{  \"status\": \"OK\"}"));
         });
 
-        Q.on("pingpong", 8080).down().exec(during(10, TimeUnit.SECONDS), () -> {
+        networkChaos.on("pingpong", 8080).down().exec(during(10, TimeUnit.SECONDS), () -> {
             URL url = new URL("http://" + ip + ":" + 8081 + "/pingpong/ping");
             HttpURLConnection con = (HttpURLConnection) url.openConnection();
             con.setRequestMethod("GET");
@@ -112,6 +114,25 @@ public class PingPongTest {
             }
         });
 
+/*
+        networkChaos.on("pingpong", 8080).exec(during(15, TimeUnit.SECONDS), () -> {
+            URL url = new URL("http://" + ip + ":" + 8081 + "/pingpong/ping");
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            con.setRequestMethod("GET");
+
+            BufferedReader in = new BufferedReader(
+                    new InputStreamReader(con.getInputStream()));
+            String inputLine;
+            StringBuffer response = new StringBuffer();
+
+            while ((inputLine = in.readLine()) != null) {
+                response.append(inputLine);
+            }
+            in.close();
+
+            assertThat(response.toString(), is("{  \"status\": \"OK\"}"));
+        });
+*/
     }
 
 }
